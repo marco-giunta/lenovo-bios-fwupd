@@ -12,6 +12,11 @@
 #
 # Requirements: 7z, gcab, fwupdmgr, python3
 #
+# Note: the script reads the EFI System Resource Table, which is root-only,
+# so the script will ask for sudo up front. Everything it writes goes to a
+# temporary directory and to the .cab beside your .exe; nothing is
+# actually flashed here.
+#
 # IMPORTANT: Ensure AC power is connected and battery is above 30% before
 # installing. Do NOT interrupt the reboot after installation.
 
@@ -55,6 +60,14 @@ fi
 for cmd in 7z gcab fwupdmgr python3; do
     command -v "$cmd" &>/dev/null || die "'$cmd' is required but not found. Please install it."
 done
+
+# --------------------------------------------------------------------------- #
+# Check for root access
+# --------------------------------------------------------------------------- #
+if [[ "$EUID" -ne 0 ]]; then
+    echo "==> Reading the ESRT needs root; requesting sudo now."
+    sudo -v || die "sudo authentication failed."
+fi
 
 # --------------------------------------------------------------------------- #
 # Set up working directory
@@ -355,12 +368,18 @@ cp "$FD_FILE" "$WORK/firmware.bin"
 
 # --------------------------------------------------------------------------- #
 # Build the .cab
+#
+# If the script was invoked through sudo, gcab runs as root and the .cab ends
+# up owned by root, leaving the user unable to overwrite or delete it without
+# e.g. rm -f.
+# Hand it back to whoever called.
 # --------------------------------------------------------------------------- #
 OUTPUT_DIR=$(dirname "$(realpath "$EXE")")
 CAB_NAME="${BIOS_VERSION}.cab"
 OUTPUT_CAB="${OUTPUT_DIR}/${CAB_NAME}"
 
 (cd "$WORK" && gcab --create "$OUTPUT_CAB" firmware.metainfo.xml firmware.bin)
+[[ -n "${SUDO_USER:-}" ]] && chown "$SUDO_USER" "$OUTPUT_CAB"
 echo "==> Created: $OUTPUT_CAB"
 
 echo ""

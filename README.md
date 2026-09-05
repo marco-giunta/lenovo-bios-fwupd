@@ -37,6 +37,10 @@ The script will:
 7. Generate fwupd-compatible metainfo XML.
 8. Package everything into a `.cab` file.
 
+> [!NOTE]
+> The script will ask for root, but it's only used to read data from the otherwise-protected ESRT EFI entries.
+> That said, as with any script you run with elevated privileges, you are encouraged to [read it](./lenovo-bios-fwupd.sh) before running it. The script is short, commented, and does only what is described above.
+
 Then install the resulting `.cab`:
 
 ```bash
