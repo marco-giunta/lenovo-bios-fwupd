@@ -94,6 +94,8 @@ If one is not, you'll get a warning: it may be a component that only the Windows
 
 This script should work on other Lenovo laptops that use Insyde H2OFFT-based BIOS updates with a `.fd` or `.bin` firmware file inside the `.exe`. If you test it on another model, please open an issue or PR to update this table.
 
+Please paste the output of the script in your issue. If it warns that a secondary binary is not contained in the main firmware image, that would be especially useful to see, as none of the machines tested so far have exhibited this case. More generally, the output will help better understand how Lenovo packages firmware across different models.
+
 ## Troubleshooting
 
 ### Firmware version formats were different, device was 'X' and release is 'Y'

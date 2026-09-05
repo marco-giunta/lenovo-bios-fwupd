@@ -75,6 +75,16 @@ if [[ "$EUID" -ne 0 ]]; then
 fi
 
 # --------------------------------------------------------------------------- #
+# Collect system information for user reports
+# --------------------------------------------------------------------------- #
+echo "==> System information:"
+echo "    Product name:         $(cat /sys/class/dmi/id/product_name 2>/dev/null)"
+echo "    Product family:       $(cat /sys/class/dmi/id/product_family 2>/dev/null)"
+echo "    Current BIOS version: $(cat /sys/class/dmi/id/bios_version 2>/dev/null)"
+echo "    EC firmware release:  $(cat /sys/class/dmi/id/ec_firmware_release 2>/dev/null)"
+echo "==> Version format: $VERSION_FORMAT"
+
+# --------------------------------------------------------------------------- #
 # Set up working directory
 # --------------------------------------------------------------------------- #
 WORK=$(mktemp -d)
