@@ -29,6 +29,8 @@ die()  { echo "${C_RED}${C_BOLD}ERROR:${C_OFF} $*" >&2; exit 1; }
 warn() { echo "${C_YELLOW}${C_BOLD}WARNING:${C_OFF} $*" >&2; }
 ok()   { echo "${C_GREEN}${C_BOLD}  OK:${C_OFF} $*"; }
 
+hex() { [[ "$1" =~ ^[0-9]+$ ]] && printf '0x%08X' "$1" || true; }
+
 # --------------------------------------------------------------------------- #
 # Argument parsing
 # --------------------------------------------------------------------------- #
@@ -265,7 +267,7 @@ done
 Is this a UEFI system with an EFI System Resource Table?"
 
 echo "==> System Firmware GUID: $FW_GUID"
-echo "==> Current firmware version (ESRT): $FW_CURRENT_VERSION"
+echo "==> Current firmware version (ESRT): $FW_CURRENT_VERSION ($(hex "$FW_CURRENT_VERSION"))"
 
 # --------------------------------------------------------------------------- #
 # Verify the image targets this machine.
@@ -347,15 +349,113 @@ fi
 # --------------------------------------------------------------------------- #
 # Determine the version number to put in the .cab metadata
 #
-# We set it to current_version + 1 so fwupd treats this as an upgrade.
-# The actual version validation is handled by the UEFI firmware itself
-# during the capsule update.
+# The binary image stores the firmware version in the 4 bytes after the $ESRT
+# tag, using little endian. Read this to correctly package metadata information
+# for fwupd.
+#
+# That 32-bit value is not opaque: the low byte holds the two BIOS version
+# digits as hex, and the upper three bytes identify the platform and stay
+# constant across updates on a given machine:
+#
+#   QFCN26WW -> 0x61250026   (tested Yoga Pro 7 14ASP10 machine, before updating)
+#   QFCN29WW -> 0x61250029   (the package that updated it)
+#   Q7CN78WW -> 0x73315078   (a Legion Pro 7i 16IAX10H package)
+#   SMCN20WW -> 0x61420020   (a Legion Pro 7 16AFR10H package)
+#
+# So the whole value can be predicted: take the ESRT version this machine
+# currently reports, replace its low byte with the digits from the package's
+# own version string, and the result must equal what the image contains. That
+# validates all four bytes rather than just the last one, and it uses two
+# independently sourced numbers -- one from sysfs, one from the image.
+#
+# Notice that this is only for packaging reasons: the actual version
+# validation is handled by the UEFI firmware itself during the capsule update.
+# That said, this is still useful to make the metadata more accurate.
+#
+# If anything here doesn't line up, those bytes mean something other than a
+# version on this model, so print a warning and fall back to the original
+# scheme of "current version + 1" to still make fwupd treat this as an upgrade.
 # --------------------------------------------------------------------------- #
-# Strip any non-numeric characters (fwupd sometimes returns formatted versions)
-NUMERIC_VERSION=$(echo "$FW_CURRENT_VERSION" | tr -cd '0-9')
-[[ -n "$NUMERIC_VERSION" ]] || die "Could not parse current firmware version: $FW_CURRENT_VERSION"
-NEW_VERSION=$((NUMERIC_VERSION + 1))
-echo "==> Metadata version for .cab: $NEW_VERSION"
+NEW_VERSION=$(python3 -c '
+import sys
+from pathlib import Path
+image = Path(sys.argv[1]).read_bytes()
+esrt_tag = b"$ESRT"
+n = image.count(esrt_tag)
+n == 1 or sys.exit(1)
+p = image.index(esrt_tag) + len(esrt_tag)
+len(image[p:p+4]) == 4 or sys.exit(1)
+print(int.from_bytes(image[p:p+4], byteorder="little"))
+' "$FD_FILE" 2>/dev/null || echo -1)
+
+FALLBACK_REASON=""
+
+if [[ "$NEW_VERSION" -lt 0 ]]; then
+    FALLBACK_REASON="the BIOS image doesn't match the known \$ESRT firmware version packaging convention"
+
+elif [[ "$BIOS_VERSION" =~ ^[A-Z0-9]{4}([0-9]{2})WW$ ]]; then
+    PKG_DIGITS="${BASH_REMATCH[1]}"
+
+    if [[ "$FW_CURRENT_VERSION" =~ ^[0-9]+$ ]] &&
+       [[ "$DMI_BIOS_VERSION" =~ ^[A-Z0-9]{4}([0-9]{2})WW ]]; then
+        CUR_DIGITS="${BASH_REMATCH[1]}"
+        CUR_LOW=$(printf '%02x' $((FW_CURRENT_VERSION & 0xFF)))
+
+        if [[ "$CUR_LOW" != "$CUR_DIGITS" ]]; then
+            # The encoding does not even hold for the firmware already running,
+            # so it cannot be used to predict the packaged one.
+            FALLBACK_REASON=$(printf \
+                "this machine's ESRT version 0x%08X ends in '%s', which doesn't match %s" \
+                "$FW_CURRENT_VERSION" "$CUR_LOW" "$DMI_BIOS_VERSION")
+        else
+            EXPECTED_VERSION=$(( (FW_CURRENT_VERSION & 0xFFFFFF00) | 16#$PKG_DIGITS ))
+            if [[ "$NEW_VERSION" -ne "$EXPECTED_VERSION" ]]; then
+                FALLBACK_REASON=$(printf \
+                    "the image's \$ESRT version is 0x%08X but %s on this machine implies 0x%08X" \
+                    "$NEW_VERSION" "$BIOS_VERSION" "$EXPECTED_VERSION")
+            fi
+        fi
+    else
+        # No usable current version to reconstruct from; check what we can,
+        # namely that the low byte decodes to the packaged version's digits.
+        NEW_LOW=$(printf '%02x' $((NEW_VERSION & 0xFF)))
+        if [[ "$NEW_LOW" != "$PKG_DIGITS" ]]; then
+            FALLBACK_REASON=$(printf \
+                "the image's \$ESRT version 0x%08X ends in '%s', which doesn't match %s" \
+                "$NEW_VERSION" "$NEW_LOW" "$BIOS_VERSION")
+        fi
+    fi
+fi
+
+if [[ -n "$FALLBACK_REASON" ]]; then
+    # The original scheme: fwupd only needs a number greater than the installed
+    # one to treat the .cab as an update. Note this is occasionally right by coincidence:
+    # since the low byte holds the version digits in hex, a decimal "+1" matches the real
+    # value only for single-step updates that don't cross a ten (26->27 yes; 26->29 or 29->30 no).
+    # Anything else leaves fwupd expecting a version the firmware will not report.
+
+    warn "$FALLBACK_REASON;"
+    warn "falling back to 'current firmware version + 1' fwupd metadata."
+    echo ""
+    warn "The BIOS update itself is unaffected -- the UEFI firmware validates the real"
+    warn "version during capsule update -- but fwupd compares the version it was"
+    warn "promised against the one the firmware reports after the update, so"
+    warn "'fwupdmgr get-history' may record a successful update as failed."
+    echo ""
+    warn "This mismatch in the reported update history is harmless if the BIOS"
+    warn "update itself succeeds."
+
+    # Strip any non-numeric characters (fwupd sometimes returns formatted versions)
+    NUMERIC_VERSION=$(echo "$FW_CURRENT_VERSION" | tr -cd '0-9')
+    [[ -n "$NUMERIC_VERSION" ]] || die "Could not parse current firmware version: $FW_CURRENT_VERSION"
+    NEW_VERSION=$((NUMERIC_VERSION + 1))
+    NEW_VERSION_INFO="installed version + 1"
+else
+    ok "The BIOS image matches the known \$ESRT firmware version packaging convention"
+    NEW_VERSION_INFO=$(hex "$NEW_VERSION")
+fi
+
+echo "==> Metadata version for .cab: $NEW_VERSION ($NEW_VERSION_INFO)"
 
 # --------------------------------------------------------------------------- #
 # Get system product name for the metainfo
