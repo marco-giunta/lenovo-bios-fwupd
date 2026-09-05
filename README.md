@@ -81,16 +81,19 @@ If one is not, you'll get a warning: it may be a component that only the Windows
 
 ## Tested laptops
 
-| Model                     | Status          |
-|---------------------------|-----------------|
-| Legion Pro 7 16IAX10H     | Tested, working |
-| IdeaPad Pro 5 16IAH10     | Tested, working |
-| Yoga 9 2in-1 14ILL10      | Tested, working |
-| Legion 5 15AHP10          | Tested, working |
-| Yoga Pro 7 Gen 10 14ASP10 | Tested, working |
+| Model                     | Status                                          |
+|---------------------------|-------------------------------------------------|
+| Legion Pro 7 16IAX10H     | Tested, working                                 |
+| IdeaPad Pro 5 16IAH10     | Tested, working                                 |
+| Yoga 9 2in-1 14ILL10      | Tested, working                                 |
+| Legion 5 15AHP10          | Tested, working                                 |
+| Yoga Pro 7 Gen 10 14ASP10 | Tested, working                                 |
+| Legion Pro 7 16AFR10H     | `.cab` generated and validated, but not flashed |
 
 > [!NOTE]
-> This script was used to successfully update the Yoga Pro 7 14ASP10 from version QFCN26WW to QFCN29WW, so it should be safe to skip intermediate images and just use the latest available one.
+> - This script was used to successfully update the Yoga Pro 7 14ASP10 from version QFCN26WW to QFCN29WW, so it should be safe to skip intermediate images and just use the latest available one.
+>
+> - On the Legion Pro 7 16AFR10H the script passed every check and produced a `.cab`, but it was not installed, because that machine was already on the most recent BIOS version at the time of writing this (`SMCN20WW`). Treat it as evidence that the packaging works on that model, not that the flash does.
 
 This script should work on other Lenovo laptops that use Insyde H2OFFT-based BIOS updates with a `.fd` or `.bin` firmware file inside the `.exe`. If you test it on another model, please open an issue or PR to update this table.
 
