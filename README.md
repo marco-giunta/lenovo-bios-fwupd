@@ -89,6 +89,23 @@ If one is not, you'll get a warning: it may be a component that only the Windows
 
 This script should work on other Lenovo laptops that use Insyde H2OFFT-based BIOS updates with a `.fd` or `.bin` firmware file inside the `.exe`. If you test it on another model, please open an issue or PR to update this table.
 
+## Troubleshooting
+
+### Firmware version formats were different, device was 'X' and release is 'Y'
+
+When trying to install a successfully packaged `.cab`, you may get the above error. For example, on the Yoga Pro 7 14ASP10, you'll get:
+
+```
+Firmware version formats were different, device was 'number' and release is 'plain'
+```
+
+To fix this, run the script again passing `X` as its second argument. For example, in the case of the above error, use:
+```bash
+./lenovo-bios-fwupd.sh <bios_update.exe> number
+```
+
+Replace the version format keyword as needed.
+
 ## License
 
 GPLv2. See [LICENSE](LICENSE).

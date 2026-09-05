@@ -23,11 +23,26 @@ die() { echo "ERROR: $*" >&2; exit 1; }
 # Argument parsing
 # --------------------------------------------------------------------------- #
 EXE="${1:-}"
+VERSION_FORMAT="${2:-plain}"
 
 if [[ "$EXE" == "--help" || "$EXE" == "-h" ]]; then
-    echo "Usage: $0 <bios_update.exe>"
+    echo "Usage: $0 <bios_update.exe> [version-format]"
     echo ""
     echo "Converts a Lenovo Windows BIOS .exe into a fwupd .cab file."
+    echo ""
+    echo "If you get this error while trying to install the generated .cab:"
+    echo ""
+    echo "  Firmware version formats were different, device was 'X' and release is 'Y'"
+    echo ""
+    echo "run again the script like this:"
+    echo "$0 <bios_update.exe> X"
+    echo "where X is what the error message said."
+    echo ""
+    echo "For example, if you got"
+    echo ""
+    echo "  Firmware version formats were different, device was 'number' and release is 'plain'"
+    echo ""
+    echo "use: $0 <bios_update.exe> number"
     exit 0
 fi
 
@@ -261,7 +276,7 @@ cat > "$WORK/firmware.metainfo.xml" <<METAINFO
     </release>
   </releases>
   <custom>
-    <value key="LVFS::VersionFormat">plain</value>
+    <value key="LVFS::VersionFormat">$VERSION_FORMAT</value>
   </custom>
 </component>
 METAINFO
