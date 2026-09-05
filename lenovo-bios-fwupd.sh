@@ -22,7 +22,12 @@
 
 set -euo pipefail
 
-die() { echo "ERROR: $*" >&2; exit 1; }
+C_RED=$'\033[0;31m'; C_GREEN=$'\033[0;32m'; C_YELLOW=$'\033[0;33m'
+C_BOLD=$'\033[1m';   C_OFF=$'\033[0m'
+
+die()  { echo "${C_RED}${C_BOLD}ERROR:${C_OFF} $*" >&2; exit 1; }
+warn() { echo "${C_YELLOW}${C_BOLD}WARNING:${C_OFF} $*" >&2; }
+ok()   { echo "${C_GREEN}${C_BOLD}  OK:${C_OFF} $*"; }
 
 # --------------------------------------------------------------------------- #
 # Argument parsing
@@ -169,13 +174,14 @@ print(haystack.find(needle) if needle else -1)
 ' "$FD_FILE" "$extra" 2>/dev/null || echo -1)
 
     if [[ "$offset" =~ ^[0-9]+$ ]] && [[ "$offset" -ge 0 ]]; then
-        echo "  OK: Secondary firmware $extra_name is contained in $FD_BASENAME at $(printf '0x%x' "$offset")"
+        ok "$(printf 'Secondary firmware %s is contained in %s at 0x%x' \
+              "$extra_name" "$FD_BASENAME" "$offset")"
     else
-        echo "  WARNING: $extra_name ($(stat -c%s "$extra") bytes) is NOT contained verbatim in
+        warn "$extra_name ($(stat -c%s "$extra") bytes) is NOT contained verbatim in
 $FD_BASENAME. It may be compressed inside the image, or it may be a separate
 component that the Windows updater flashes on its own. If the latter, the
 update induced by the .cab file produced by this script will not touch it,
-and that component will stay on its current version." >&2
+and that component will stay on its current version."
     fi
 done
 
@@ -270,7 +276,7 @@ import sys, uuid
 image = open(sys.argv[1], "rb").read()
 sys.exit(0 if uuid.UUID(sys.argv[2]).bytes_le in image else 1)
 ' "$FD_FILE" "$FW_GUID"; then
-    echo "  OK: $FD_BASENAME targets this machine's System Firmware GUID."
+    ok "$FD_BASENAME targets this machine's System Firmware GUID."
 else
     die "$FD_BASENAME does not reference this machine's System Firmware GUID
 ($FW_GUID). This package is for a different device."
@@ -306,7 +312,7 @@ DMI_BIOS_VERSION=$(cat /sys/class/dmi/id/bios_version 2>/dev/null)
 
 if [[ "$DMI_BIOS_VERSION" =~ ^[A-Z0-9]{4}[0-9]{2}WW ]]; then
     if [[ "${BIOS_VERSION:0:4}" == "${DMI_BIOS_VERSION:0:4}" ]]; then
-        echo "  OK: Platform code matches: ${BIOS_VERSION:0:4} (machine on $DMI_BIOS_VERSION, package $BIOS_VERSION)"
+        ok "Platform code matches: ${BIOS_VERSION:0:4} (machine on $DMI_BIOS_VERSION, package $BIOS_VERSION)"
     else
         die "Platform code mismatch.
   image  : $BIOS_VERSION
