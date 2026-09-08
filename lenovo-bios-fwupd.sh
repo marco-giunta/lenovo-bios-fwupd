@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 # lenovo-bios-fwupd.sh
-# Version 1.0
+# Version 2.0
 # Nadim Kobeissi -- https://github.com/nadimkobeissi/lenovo-bios-fwupd
 #
 # Converts a Lenovo Windows BIOS update .exe (Insyde H2OFFT based) into a
