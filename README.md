@@ -106,6 +106,10 @@ To fix this, run the script again passing `X` as its second argument. For exampl
 
 Replace the version format keyword as needed.
 
+### Device X [System Firmware] does not currently allow updates
+
+fwupd will refuse to install BIOS updates on devices running on battery; plug in the charger and try again.
+
 ## License
 
 GPLv2. See [LICENSE](LICENSE).
