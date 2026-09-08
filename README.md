@@ -33,8 +33,9 @@ The script will:
 3. Check that any other firmware blobs in the package are inside that image.
 4. Read the BIOS version string from the firmware image.
 5. Read your system's firmware GUID and current version from the ESRT.
-6. Generate fwupd-compatible metainfo XML.
-7. Package everything into a `.cab` file.
+6. Check the image targets this machine: its System Firmware GUID must match the `fw_type=1` entry in the ESRT, and the four-character platform code in its version string must match `/sys/class/dmi/id/bios_version`. Both are fatal on mismatch; the second is skipped on models whose BIOS version does not follow that scheme. Note that neither check subsumes the other: two Legion Pro 7 models with different silicon (16IAX10H/16AFR10H, Intel/AMD) share a System Firmware GUID and are distinguished only by the platform code, while the platform code check is skipped entirely on machines using a different version scheme.
+7. Generate fwupd-compatible metainfo XML.
+8. Package everything into a `.cab` file.
 
 Then install the resulting `.cab`:
 

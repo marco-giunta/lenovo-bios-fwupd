@@ -169,7 +169,8 @@ done
 # --------------------------------------------------------------------------- #
 # Read the BIOS version string
 #
-# Used for the .cab filename and the metainfo description.
+# Used for the .cab filename, the metainfo description, and the platform code
+# check further down.
 #
 # Insyde images carry a BIOS Version Data Table, introduced by a $BVDT tag and
 # followed by '$'-prefixed, NUL-terminated records; the first non-empty record
@@ -236,6 +237,72 @@ Is this a UEFI system with an EFI System Resource Table?"
 
 echo "==> System Firmware GUID: $FW_GUID"
 echo "==> Current firmware version (ESRT): $FW_CURRENT_VERSION"
+
+# --------------------------------------------------------------------------- #
+# Verify the image targets this machine.
+#
+# Insyde images embed the ESRT System Firmware GUID they belong to.
+# For simplicity, rather than locating and decoding it, convert this machine's
+# GUID to its raw 16 bytes and check whether the image contains them.
+#
+# Note this GUID is per-family, not per-model: the Legion Pro 7 16IAX10H
+# (Intel, Q7CN78WW) and 16AFR10H (AMD, SMCN20WW) packages both carry
+# be248459-caf2-4b09-af02-69b6a49974c1, and are told apart only by the
+# platform code check below. Conversely, that check is skipped on machines
+# whose BIOS version doesn't follow the ...NNWW scheme, where this is the
+# only compatibility check that runs. Neither subsumes the other.
+# --------------------------------------------------------------------------- #
+if python3 -c '
+import sys, uuid
+image = open(sys.argv[1], "rb").read()
+sys.exit(0 if uuid.UUID(sys.argv[2]).bytes_le in image else 1)
+' "$FD_FILE" "$FW_GUID"; then
+    echo "  OK: $FD_BASENAME targets this machine's System Firmware GUID."
+else
+    die "$FD_BASENAME does not reference this machine's System Firmware GUID
+($FW_GUID). This package is for a different device."
+fi
+
+# --------------------------------------------------------------------------- #
+# Second, independent compatibility check.
+#
+# The GUID check above compares the image against the ESRT. This one compares a
+# different field of the image -- its embedded version string -- against a
+# different source on the machine, /sys/class/dmi/id/bios_version.
+#
+# On the Yoga, Legion and IdeaPad models this script is known to work with,
+# those version strings take the form of a four-character code identifying the
+# board family, two digits for the BIOS version, then "WW" -- e.g. QFCN29WW,
+# Q7CN78WW. Where both sides use that form, the four-character codes must
+# agree.
+# This was explicitly verified by direct inspection of a Yoga Pro 7 14ASP10,
+# BIOS versions QFCN26WW - QFCN28WW - QFCN29WW, as well as Legion Pro 7i 16IAX10H
+# BIOS Q7CN78WW and Legion Pro 7 16AFR10H BIOS SMCN20WW.
+#
+# This is not a universal Lenovo convention, though; for example, ThinkPads
+# use a different form -- but this script may not be needed there in the
+# first place since many of those models are served by LVFS.
+#
+# So the check only runs when the machine reports a version in the form above:
+# 4 characters, 2 numbers, WW.
+# Comparing version strings we do not recognise risks refusing a package that
+# is in fact correct, so on other schemes we report that only the first check
+# was run rather than guessing.
+# --------------------------------------------------------------------------- #
+DMI_BIOS_VERSION=$(cat /sys/class/dmi/id/bios_version 2>/dev/null)
+
+if [[ "$DMI_BIOS_VERSION" =~ ^[A-Z0-9]{4}[0-9]{2}WW ]]; then
+    if [[ "${BIOS_VERSION:0:4}" == "${DMI_BIOS_VERSION:0:4}" ]]; then
+        echo "  OK: Platform code matches: ${BIOS_VERSION:0:4} (machine on $DMI_BIOS_VERSION, package $BIOS_VERSION)"
+    else
+        die "Platform code mismatch.
+  image  : $BIOS_VERSION
+  machine: $DMI_BIOS_VERSION"
+    fi
+else
+    echo "==> Platform code check skipped: this machine reports BIOS version"
+    echo "    '$DMI_BIOS_VERSION', which is not the scheme this check knows."
+fi
 
 # --------------------------------------------------------------------------- #
 # Determine the version number to put in the .cab metadata
