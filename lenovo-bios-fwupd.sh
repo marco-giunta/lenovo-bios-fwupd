@@ -322,7 +322,18 @@ DMI_BIOS_VERSION=$(cat /sys/class/dmi/id/bios_version 2>/dev/null)
 
 if [[ "$DMI_BIOS_VERSION" =~ ^[A-Z0-9]{4}[0-9]{2}WW ]]; then
     if [[ "${BIOS_VERSION:0:4}" == "${DMI_BIOS_VERSION:0:4}" ]]; then
-        ok "Platform code matches: ${BIOS_VERSION:0:4} (machine on $DMI_BIOS_VERSION, package $BIOS_VERSION)"
+        ok "Platform code matches: ${BIOS_VERSION:0:4}"
+
+        IMAGE_VERSION="${BIOS_VERSION:4:2}"
+        MACHINE_VERSION="${DMI_BIOS_VERSION:4:2}"
+
+        if [[ "$IMAGE_VERSION" == "$MACHINE_VERSION" ]]; then
+            warn "This machine already has BIOS version $DMI_BIOS_VERSION; continuing anyway"
+        elif [[ $IMAGE_VERSION -lt $MACHINE_VERSION ]]; then
+            die "This machine has BIOS version $DMI_BIOS_VERSION, but package includes the older version $BIOS_VERSION"
+        else
+            ok "Machine on BIOS version $DMI_BIOS_VERSION, package on $BIOS_VERSION"
+        fi
     else
         die "Platform code mismatch.
   image  : $BIOS_VERSION
