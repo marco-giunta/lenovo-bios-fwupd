@@ -23,7 +23,7 @@ Many Lenovo laptops don't receive BIOS updates through [LVFS](https://fwupd.org/
 ## Usage
 
 ```bash
-./lenovo-bios-fwupd.sh <bios_update.exe>
+sudo ./lenovo-bios-fwupd.sh [--allow-older] <bios_update.exe>
 ```
 
 The script will:

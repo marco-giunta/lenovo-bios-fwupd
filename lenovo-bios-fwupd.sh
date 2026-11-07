@@ -8,7 +8,7 @@
 # fwupd-compatible .cab file that can be installed from Linux.
 #
 # Usage:
-#   ./lenovo-bios-fwupd.sh <bios_update.exe>
+#   sudo ./lenovo-bios-fwupd.sh [--allow-older] <bios_update.exe>
 #
 # Requirements: 7z, gcab, fwupdmgr, python3
 #
@@ -34,16 +34,35 @@ hex() { [[ "$1" =~ ^[0-9]+$ ]] && printf '0x%08X' "$1" || true; }
 # --------------------------------------------------------------------------- #
 # Argument parsing
 # --------------------------------------------------------------------------- #
-EXE="${1:-}"
+EXE=""
+ALLOW_OLDER=0
 
-if [[ "$EXE" == "--help" || "$EXE" == "-h" ]]; then
-    echo "Usage: $0 <bios_update.exe>"
-    echo ""
-    echo "Converts a Lenovo Windows BIOS .exe into a fwupd .cab file."
-    exit 0
-fi
+while (( $# )); do
+    case "$1" in
+        -h|--help)
+            echo "Usage: $0 [--allow-older] <bios_update.exe>"
+            echo ""
+            echo "Converts a Lenovo Windows BIOS .exe into a fwupd .cab file."
+            echo ""
+            echo "  --allow-older  Package a BIOS older than the one installed."
+            echo "                 This is mostly intended for testing the script."
+            echo "                 To actually downgrade the BIOS, note that on top"
+            echo "                 of this 'fwupdmgr install' needs the --allow-older"
+            echo "                 argument as well, and the firmware may still refuse"
+            echo "                 the capsule at boot (BIOS downgrades have to be"
+            echo "                 explicitly enabled in the BIOS options menu)."
+            exit 0
+            ;;
+        --allow-older) ALLOW_OLDER=1 ;;
+        --) shift; [[ $# -gt 0 ]] && EXE="$1"; break ;;
+        -*) die "Unknown option: $1 (try --help)" ;;
+        *)  [[ -z "$EXE" ]] || die "Unexpected extra argument: $1"
+            EXE="$1" ;;
+    esac
+    shift
+done
 
-[[ -n "$EXE" ]] || die "Usage: $0 <bios_update.exe>"
+[[ -n "$EXE" ]] || die "Usage: $0 [--allow-older] <bios_update.exe>"
 [[ -f "$EXE" ]] || die "File not found: $EXE"
 
 # --------------------------------------------------------------------------- #
@@ -316,7 +335,18 @@ if [[ "$DMI_BIOS_VERSION" =~ ^[A-Z0-9]{4}[0-9]{2}WW ]]; then
         if [[ "$IMAGE_VERSION" == "$MACHINE_VERSION" ]]; then
             warn "This machine already has BIOS version $DMI_BIOS_VERSION; continuing anyway"
         elif (( 10#$IMAGE_VERSION < 10#$MACHINE_VERSION )); then
-            die "This machine has BIOS version $DMI_BIOS_VERSION, but package includes the older version $BIOS_VERSION"
+            if (( ALLOW_OLDER )); then
+                warn "Packaging $BIOS_VERSION, older than the installed $DMI_BIOS_VERSION."
+                warn "-> If you're just testing the script's .cab package building logic,"
+                warn "you can ignore this warning."
+                warn "-> If you are instead trying to actually downgrade the BIOS, note that"
+                warn "'fwupdmgr install' will refuse this unless you also pass --allow-older,"
+                warn "and the firmware may still decline the capsule at boot"
+                warn "(BIOS downgrades have to be enabled in the BIOS options menu)."
+            else
+                die "This machine has BIOS version $DMI_BIOS_VERSION, but package includes the older version $BIOS_VERSION
+Pass --allow-older to package it anyway."
+            fi
         else
             ok "Machine on BIOS version $DMI_BIOS_VERSION, package on $BIOS_VERSION"
         fi
