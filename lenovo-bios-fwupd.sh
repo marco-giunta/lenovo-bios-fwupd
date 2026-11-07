@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 #
 # lenovo-bios-fwupd.sh
-# Version 2.0
+# Version 2.1
 # Nadim Kobeissi -- https://github.com/nadimkobeissi/lenovo-bios-fwupd
+# Modified by Marco Giunta -- https://github.com/marco-giunta/lenovo-bios-fwupd
 #
 # Converts a Lenovo Windows BIOS update .exe (Insyde H2OFFT based) into a
 # fwupd-compatible .cab file that can be installed from Linux.
