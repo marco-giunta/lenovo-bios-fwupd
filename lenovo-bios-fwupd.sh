@@ -315,7 +315,7 @@ if [[ "$DMI_BIOS_VERSION" =~ ^[A-Z0-9]{4}[0-9]{2}WW ]]; then
 
         if [[ "$IMAGE_VERSION" == "$MACHINE_VERSION" ]]; then
             warn "This machine already has BIOS version $DMI_BIOS_VERSION; continuing anyway"
-        elif [[ $IMAGE_VERSION -lt $MACHINE_VERSION ]]; then
+        elif (( 10#$IMAGE_VERSION < 10#$MACHINE_VERSION )); then
             die "This machine has BIOS version $DMI_BIOS_VERSION, but package includes the older version $BIOS_VERSION"
         else
             ok "Machine on BIOS version $DMI_BIOS_VERSION, package on $BIOS_VERSION"
