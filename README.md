@@ -34,7 +34,7 @@ The script will:
 4. Read the BIOS version string from the firmware image.
 5. Read your system's firmware GUID and current version from the ESRT.
 6. Check the image targets this machine: its System Firmware GUID must match the `fw_type=1` entry in the ESRT, and the four-character platform code in its version string must match `/sys/class/dmi/id/bios_version`. Both are fatal on mismatch; the second is skipped on models whose BIOS version does not follow that scheme. Note that neither check subsumes the other: two Legion Pro 7 models with different silicon (16IAX10H/16AFR10H, Intel/AMD) share a System Firmware GUID and are distinguished only by the platform code, while the platform code check is skipped entirely on machines using a different version scheme.
-7. Generate fwupd-compatible metainfo XML.
+7. Generate fwupd-compatible metainfo XML, taking the version format from the device as `fwupdmgr get-devices` reports it.
 8. Package everything into a `.cab` file.
 
 > [!NOTE]
@@ -100,21 +100,6 @@ This script should work on other Lenovo laptops that use Insyde H2OFFT-based BIO
 Please paste the output of the script in your issue. If it warns that a secondary binary is not contained in the main firmware image, that would be especially useful to see, as none of the machines tested so far have exhibited this case. More generally, the output will help better understand how Lenovo packages firmware across different models.
 
 ## Troubleshooting
-
-### Firmware version formats were different, device was 'X' and release is 'Y'
-
-When trying to install a successfully packaged `.cab`, you may get the above error. For example, on the Yoga Pro 7 14ASP10, you'll get:
-
-```
-Firmware version formats were different, device was 'number' and release is 'plain'
-```
-
-To fix this, run the script again passing `X` as its second argument. For example, in the case of the above error, use:
-```bash
-./lenovo-bios-fwupd.sh <bios_update.exe> number
-```
-
-Replace the version format keyword as needed.
 
 ### Device X [System Firmware] does not currently allow updates
 

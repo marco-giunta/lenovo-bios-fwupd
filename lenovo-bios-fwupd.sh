@@ -35,26 +35,11 @@ hex() { [[ "$1" =~ ^[0-9]+$ ]] && printf '0x%08X' "$1" || true; }
 # Argument parsing
 # --------------------------------------------------------------------------- #
 EXE="${1:-}"
-VERSION_FORMAT="${2:-plain}"
 
 if [[ "$EXE" == "--help" || "$EXE" == "-h" ]]; then
-    echo "Usage: $0 <bios_update.exe> [version-format]"
+    echo "Usage: $0 <bios_update.exe>"
     echo ""
     echo "Converts a Lenovo Windows BIOS .exe into a fwupd .cab file."
-    echo ""
-    echo "If you get this error while trying to install the generated .cab:"
-    echo ""
-    echo "  Firmware version formats were different, device was 'X' and release is 'Y'"
-    echo ""
-    echo "run again the script like this:"
-    echo "$0 <bios_update.exe> X"
-    echo "where X is what the error message said."
-    echo ""
-    echo "For example, if you got"
-    echo ""
-    echo "  Firmware version formats were different, device was 'number' and release is 'plain'"
-    echo ""
-    echo "use: $0 <bios_update.exe> number"
     exit 0
 fi
 
@@ -84,7 +69,6 @@ echo "    Product name:         $(cat /sys/class/dmi/id/product_name 2>/dev/null
 echo "    Product family:       $(cat /sys/class/dmi/id/product_family 2>/dev/null)"
 echo "    Current BIOS version: $(cat /sys/class/dmi/id/bios_version 2>/dev/null)"
 echo "    EC firmware release:  $(cat /sys/class/dmi/id/ec_firmware_release 2>/dev/null)"
-echo "==> Version format: $VERSION_FORMAT"
 
 # --------------------------------------------------------------------------- #
 # Set up working directory
@@ -461,6 +445,30 @@ echo "==> Metadata version for .cab: $NEW_VERSION ($NEW_VERSION_INFO)"
 # Get system product name for the metainfo
 # --------------------------------------------------------------------------- #
 PRODUCT=$(cat /sys/class/dmi/id/product_family 2>/dev/null || echo "Lenovo Laptop")
+
+# --------------------------------------------------------------------------- #
+# Version format for the metainfo
+#
+# fwupd compares the release's LVFS::VersionFormat against the format reported
+# by the device the release applies to and requires an exact match
+# (fu_release_check_verfmt() in src/fu-release.c), refusing the install with
+#   Firmware version formats were different, device was 'X' and release is 'Y'
+#
+# The format is a property of the device, not of the package, so ask fwupd
+# about the device we have already identified by its ESRT GUID rather than
+# hardcoding a value. Falls back to 'plain' if the device cannot be found.
+# --------------------------------------------------------------------------- #
+VERSION_FORMAT=$(fwupdmgr get-devices --json 2>/dev/null | python3 -c '
+import json, sys
+guid = sys.argv[1].lower()
+devices = json.load(sys.stdin).get("Devices", [])
+for dev in devices:
+    if guid in (g.lower() for g in dev.get("Guid", [])):
+        print(dev.get("VersionFormat", ""))
+        break
+' "$FW_GUID" 2>/dev/null) || VERSION_FORMAT=""
+VERSION_FORMAT=${VERSION_FORMAT:-plain}
+echo "==> Version format: $VERSION_FORMAT"
 
 # --------------------------------------------------------------------------- #
 # Build metainfo XML
